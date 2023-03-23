@@ -1,11 +1,12 @@
 const crypto = require('crypto');
 const readline = require('readline');
+const { AsciiTable3 } = require('ascii-table3');
 
 class Game {
     constructor(moves) {
         this.moves = moves;
-        this.table = new Table(moves);
         this.winner = new WinnerSelector(moves);
+        this.tableGenerator = new TableGenerator(moves, this.winner);
         this.cryptoUtils = new CryptoUtils();
         this.key = this.cryptoUtils.generateSecureKey();
         this.computerMove = this.moves[crypto.randomInt(this.moves.length)];
@@ -32,7 +33,12 @@ class Game {
             if (answer === "0") {
             console.log("Exiting the game...\n");
             this.rl.close();
-            } else {
+            } else if (answer == "help") {
+                // console.log(this.tableGenerator.generate());
+                this.tableGenerator.printTable();
+                this.start();
+            }
+            else {
             this.showResults(answer);
             }
         });
@@ -67,16 +73,29 @@ class WinnerSelector {
 
     determineWinner(userMove, computerMove) {
         const index = this.moves.indexOf(userMove);
-        const half = Math.ceil(this.moves.length / 2);
-        const endIndex = index + half > this.moves.length ? half - (this.moves.length - index) : index + half;
-        const winningMoves = this.moves.slice(index + 1, endIndex);
+        const totalMoves = this.moves.length;
+        const half = Math.floor(totalMoves / 2);
+        let endIndex = (index + half) % totalMoves;
+      
+        if (index === totalMoves - 1) {
+          endIndex = half - 1;
+        }
+      
+        const winningMoves = [];
+        if (endIndex > index) {
+          winningMoves.push(...this.moves.slice(index + 1, endIndex + 1));
+        } else {
+          winningMoves.push(...this.moves.slice(index + 1), ...this.moves.slice(0, endIndex + 1));
+        }
+      
         if (userMove === computerMove) {
-            return "draw";
+          return "draw";
         } else if (winningMoves.includes(computerMove)) {
-            return "computer";
-        } 
-        return "user";    
-    }
+          return "computer";
+        } else {
+          return "user";
+        }
+      }
   }
   
 class CryptoUtils {
@@ -91,11 +110,35 @@ class CryptoUtils {
     }
   }
 
-class Table {
-          constructor(moves) {
-          this.moves = moves;
+class TableGenerator {
+    constructor(moves, winnerSelector) {
+      this.moves = moves;
+      this.winnerSelector = winnerSelector;
+      this.table = new AsciiTable3('Moves and Results');
+      this.table.setHeading('', ...moves);
+      this.fillTable();
     }
-}
+  
+    fillTable() {
+      for (let i = 0; i < this.moves.length; i++) {
+        const row = [this.moves[i]];
+        for (let j = 0; j < this.moves.length; j++) {
+          if (i === j) {
+            row.push('-');
+          } else {
+            const result = this.winnerSelector.determineWinner(this.moves[i], this.moves[j]);
+            row.push(result === 'user' ? 'win' : 'lose');
+          }
+        }
+        this.table.addRow(...row);
+      }
+    }
+  
+    printTable() {
+      console.log(this.table.toString());
+    }
+  }
+  
 
 const moves = process.argv.slice(2);    
 const game = new Game(moves);
